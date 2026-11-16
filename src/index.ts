@@ -1,12 +1,11 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import path from 'path';
 
-dotenv.config();
+import service from './service.mjs';
 
 const app = express();
-const port = process.env.PORT || 4000;
+const port = service.port();
 
 import masterDataRoutes from './routes/masterData.routes';
 import planRoutes from './routes/plan.routes';
@@ -43,6 +42,6 @@ app.use((err: any, req: Request, res: Response, next: express.NextFunction) => {
 });
 
 // Start Server
-app.listen(port, () => {
+app.listen(port, '0.0.0.0', () => {
   console.log(`Server is running on port ${port}`);
 });

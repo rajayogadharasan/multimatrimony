@@ -1,9 +1,9 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import { or } from '@prisma/orm-postgres/orm-client';
 import prisma from '../lib/prisma';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-here';
+import { JWT_SECRET } from '../lib/jwt';
 
 export const register = async (req: Request, res: Response) => {
   try {
@@ -21,7 +21,7 @@ export const register = async (req: Request, res: Response) => {
       education
     } = req.body;
 
-    const existingUser = await prisma.user.findUnique({ where: { email } });
+    const existingUser = await prisma.orm.public.User.where({ email }).first();
     if (existingUser) {
       return res.status(400).json({ error: 'User with this email already exists' });
     }
@@ -34,25 +34,21 @@ export const register = async (req: Request, res: Response) => {
     // For this simple implementation, we'll assume they pass IDs if they select from dropdowns, or we just leave them null
     // since the original createUser required those IDs. Let's create it with defaults for now and let them update later.
 
-    const user = await prisma.user.create({
-      data: {
-        email,
-        passwordHash,
-        role: 'USER',
-        status: 'PENDING',
-        profile: {
-          create: {
-            firstName: firstName || '',
-            lastName: lastName || '',
-            gender: gender === 'female' ? 'FEMALE' : 'MALE',
-            dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : new Date('2000-01-01'),
-            mobileNo: mobileNo || '',
-            caste: caste ? { connect: { id: Number(caste) } } : undefined,
-            education: education ? { connect: { id: Number(education) } } : undefined,
-          }
-        }
-      },
-      include: { profile: true }
+    const user = await prisma.orm.public.User.include('profile').create({
+      email,
+      passwordHash,
+      role: 'USER',
+      status: 'PENDING',
+      profile: (p) => p.create({
+        firstName: firstName || '',
+        lastName: lastName || '',
+        gender: gender === 'female' ? 'FEMALE' : 'MALE',
+        dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : new Date('2000-01-01'),
+        mobileNo: mobileNo || '',
+        photos: [],
+        casteId: caste ? Number(caste) : undefined,
+        educationId: education ? Number(education) : undefined,
+      }),
     });
 
     const token = jwt.sign(
@@ -73,14 +69,9 @@ export const login = async (req: Request, res: Response) => {
     const { registrationId, password } = req.body; // Can be email or registrationId depending on frontend form
 
     // Support both email and registrationId for login
-    const user = await prisma.user.findFirst({
-      where: {
-        OR: [
-          { email: registrationId },
-          { registrationId: registrationId }
-        ]
-      }
-    });
+    const user = await prisma.orm.public.User
+      .where((u) => or(u.email.eq(registrationId), u.registrationId.eq(registrationId)))
+      .first();
 
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
