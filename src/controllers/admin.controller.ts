@@ -4,50 +4,44 @@ import prisma from '../lib/prisma';
 export const getDashboardMetrics = async (req: Request, res: Response) => {
   try {
     // 1. Total Users
-    const totalUsers = await prisma.user.count({
-      where: { role: 'USER' },
-    });
+    const totalUsers = (
+      await prisma.orm.public.User
+        .where({ role: 'USER' })
+        .aggregate((a) => ({ total: a.count() }))
+    ).total;
 
     // 2. Premium Members
     const now = new Date();
-    const premiumMembers = await prisma.userSubscription.count({
-      where: {
-        endDate: { gte: now },
-      },
-    });
+    const premiumMembers = (
+      await prisma.orm.public.UserSubscription
+        .where((s) => s.endDate.gte(now))
+        .aggregate((a) => ({ total: a.count() }))
+    ).total;
 
     // 3. Pending Verifications
-    const pendingVerifications = await prisma.user.count({
-      where: {
-        role: 'USER',
-        status: 'PENDING',
-      },
-    });
+    const pendingVerifications = (
+      await prisma.orm.public.User
+        .where({ role: 'USER', status: 'PENDING' })
+        .aggregate((a) => ({ total: a.count() }))
+    ).total;
 
     // 4. Total Revenue
-    const successfulTransactions = await prisma.transaction.findMany({
-      where: { status: 'SUCCESS' },
-      select: { amount: true },
-    });
+    const successfulTransactions = await prisma.orm.public.Transaction
+      .where({ status: 'SUCCESS' })
+      .select('amount')
+      .all();
     const totalRevenue = successfulTransactions.reduce(
-      (sum, tx) => sum + Number(tx.amount),
+      (sum: number, tx) => sum + Number(tx.amount),
       0
     );
 
     // 5. Recent Registrations
-    const recentRegistrations = await prisma.user.findMany({
-      where: { role: 'USER' },
-      orderBy: { createdAt: 'desc' },
-      take: 20,
-      include: {
-        profile: {
-          select: {
-            firstName: true,
-            lastName: true,
-          }
-        }
-      },
-    });
+    const recentRegistrations = await prisma.orm.public.User
+      .where({ role: 'USER' })
+      .include('profile', (p) => p.select('firstName', 'lastName'))
+      .orderBy((u) => u.createdAt.desc())
+      .limit(20)
+      .all();
 
     const formattedRecentRegistrations = recentRegistrations.map((user) => ({
       id: user.registrationId || user.id.substring(0, 8).toUpperCase(),
