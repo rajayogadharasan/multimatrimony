@@ -1,0 +1,232 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum UserStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+enum MasterDataType {
+  CASTE
+  EDUCATION
+  COUNTRY
+  OCCUPATION
+  BANK
+  CONTACT_ADDRESS
+}
+
+enum TransactionStatus {
+  SUCCESS
+  FAILED
+  PENDING
+}
+
+model User {
+  id             String             @id @default(uuid())
+  registrationId String?
+  email          String             @unique
+  passwordHash   String
+  role           Role               @default(USER)
+  status         UserStatus         @default(PENDING)
+  isActive       Boolean            @default(true)
+  isVip          Boolean            @default(false)
+  createdAt      DateTime           @default(now())
+  
+  profile        UserProfile?
+  subscriptions  UserSubscription[]
+  transactions   Transaction[]
+  
+  viewedProfiles ProfileView[] @relation("Viewer")
+  viewedBy       ProfileView[] @relation("Viewed")
+  
+  printedProfiles ProfilePrint[] @relation("Printer")
+  printedBy       ProfilePrint[] @relation("Printed")
+  
+  likesGiven     ProfileLike[] @relation("Liker")
+  likesReceived  ProfileLike[] @relation("Liked")
+  notifications  Notification[]
+}
+
+model UserProfile {
+  id            String    @id @default(uuid())
+  userId        String    @unique
+  user          User      @relation(fields: [userId], references: [id])
+  firstName     String
+  lastName      String
+  gender        Gender
+  dateOfBirth   DateTime
+  
+  casteId       Int?
+  caste         MasterData? @relation("CasteRelation", fields: [casteId], references: [id])
+  
+  educationId   Int?
+  education     MasterData? @relation("EducationRelation", fields: [educationId], references: [id])
+  
+  occupationId  Int?
+  occupation    MasterData? @relation("OccupationRelation", fields: [occupationId], references: [id])
+  
+  countryId     Int?
+  country       MasterData? @relation("CountryRelation", fields: [countryId], references: [id])
+  
+  bio           String?   @db.Text
+  
+  height        Int?
+  weight        Int?
+  fatherName    String?
+  fatherOccupation String?
+  motherName    String?
+  motherOccupation String?
+  fatherNative     String?
+  motherNative     String?
+  nativePlace      String?
+  birthPlace       String?
+  brothers         Int?
+  brothersMarried  Int?
+  sisters          Int?
+  sistersMarried   Int?
+  familyDeity      String?
+  properties       String?
+  expectations     String?
+  income        String?
+  workplace     String?
+  horoscopeFile String?   @db.Text
+  photoFile     String?   @db.Text
+  photos        String[]
+  address1      String?
+  address2      String?
+  city          String?
+  mobileNo      String?
+  specialCase   String?
+  profileFor    String?
+  rasiGrid      Json?
+  amsamGrid     Json?
+  rasi          String?
+  natchathiram  String?
+  lagnam        String?
+  padam         String?
+  dasaIruppu    String?
+  dasaBalanceYear  Int?
+  dasaBalanceMonth Int?
+  dasaBalanceDay   Int?
+}
+
+model MasterData {
+  id             Int             @id @default(autoincrement())
+  type           MasterDataType
+  name           String
+  isActive       Boolean         @default(true)
+  
+  // Bank specific fields
+  accountName    String?
+  bankName       String?
+  accountNo      String?
+  ifscCode       String?
+  bankImage      String?
+  qrImage        String?
+  
+  // Contact Address specific fields
+  contactName    String?
+  address        String?
+  city           String?
+  phoneNo        String?
+  emailId        String?
+  pinCode        String?
+  
+  casteProfiles      UserProfile[] @relation("CasteRelation")
+  educationProfiles  UserProfile[] @relation("EducationRelation")
+  occupationProfiles UserProfile[] @relation("OccupationRelation")
+  countryProfiles    UserProfile[] @relation("CountryRelation")
+}
+
+model MembershipPlan {
+  id             String             @id @default(uuid())
+  name           String
+  price          Decimal
+  durationMonths Int
+  contactsCount  Int
+  isActive       Boolean            @default(true)
+  features       String[]
+  
+  subscriptions  UserSubscription[]
+  transactions   Transaction[]
+}
+
+model UserSubscription {
+  id                String          @id @default(uuid())
+  userId            String
+  user              User            @relation(fields: [userId], references: [id])
+  planId            String
+  plan              MembershipPlan  @relation(fields: [planId], references: [id])
+  startDate         DateTime
+  endDate           DateTime
+  remainingContacts Int
+}
+
+model Transaction {
+  id        String            @id
+  userId    String
+  user      User              @relation(fields: [userId], references: [id])
+  planId    String
+  plan      MembershipPlan    @relation(fields: [planId], references: [id])
+  amount    Decimal
+  status    TransactionStatus
+  createdAt DateTime          @default(now())
+}
+
+model ProfileView {
+  id        String   @id @default(uuid())
+  viewerId  String
+  viewer    User     @relation("Viewer", fields: [viewerId], references: [id])
+  viewedId  String
+  viewed    User     @relation("Viewed", fields: [viewedId], references: [id])
+  viewedAt  DateTime @default(now())
+
+  @@unique([viewerId, viewedId])
+}
+
+model ProfileLike {
+  id        String   @id @default(uuid())
+  likerId   String
+  liker     User     @relation("Liker", fields: [likerId], references: [id])
+  likedId   String
+  liked     User     @relation("Liked", fields: [likedId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([likerId, likedId])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model ProfilePrint {
+  id        String   @id @default(uuid())
+  printerId String
+  printer   User     @relation("Printer", fields: [printerId], references: [id])
+  printedId String
+  printed   User     @relation("Printed", fields: [printedId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([printerId, printedId])
+}
